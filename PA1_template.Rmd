@@ -1,25 +1,198 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
-
+# Basic Analysis of 'Activty monitoring devices' Data
 
 ## Loading and preprocessing the data
 
+We will load the csv file containing activity data into variable 'dat' and look at summarised content
 
+```{r}
+dat <- read.csv("activity.csv")
+summary(dat)
+str(dat)
+```
+
+The variables included in this dataset are:
+
+- steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)
+- date: The date on which the measurement was taken in YYYY-MM-DD format
+- interval: Identifier for the 5-minute interval in which measurement was taken
 
 ## What is mean total number of steps taken per day?
 
+We will split the dataframe 'dat' based on the date using split function and store the list in 'dat2'.Then we will calculate the total no of steps taken per day, mean and median and store it in data frame format.
 
+```{r}
+dat2 <- split(dat, dat$date)
+daysum <- sapply(dat2, function(x) sum(x[, 1]))
+daymean <- sapply(dat2, function(x) mean(x[, 1]))
+daymedian <- sapply(dat2, function(x) median(x[, 1]))
+s <- data.frame(date = names(daysum), totalsteps = daysum, meansteps = daymean, mediansteps = daymedian)
+row.names(s) <- 1:61
+head(s)
+```
+
+Lets make a histogram plot of the Number of steps taken in a day
+
+```{r}
+hist(s$totalsteps, col ="red", xlab = "No of steps", main = "Number of steps taken in a day")
+```
+
+Report of the mean and median of no of steps taken in a day
+```{r}
+s[, 3:4]
+```
 
 ## What is the average daily activity pattern?
 
+lets make a new data frame 'i' containg the interval and mean of steps taken over each day
 
+```{r}
+
+intervals <- unique(dat$interval)
+
+itr <- dat 
+itr$interval <- as.factor(itr$interval)
+
+dat3 <- split(itr, itr$interval)
+
+intervalmean <- sapply(dat3, function(x) mean(x[, 1], na.rm = TRUE))
+
+i <- data.frame(interval = names(intervalmean), meansteps = intervalmean)
+row.names(i) <- 1:288
+i$interval <- intervals
+head(i)
+
+```
+
+Lets plot the graph between the interval and mean of steps taken over the all day in that interval
+
+```{r}
+
+plot(i$interval, i$meansteps, type ='l', xlab = "Interval", ylab = "Mean of steps over all days", col = "blue")
+
+i[which(i$meansteps == max(i$meansteps)),]
+```
+
+So in this graph the maximum occurs at intrval 835 :- which is interpreted as (8:35am to 8:40am) which is 104th interval of that day
 
 ## Imputing missing values
 
+Lets calculate the number of missing rows in the main data file
+
+```{r}
+print("Number of missing values")
+length(which(is.na(dat$steps)))
+print("Number of days having missing values")
+length(which(is.na(dat$steps)))/288
+which(is.na(daysum))
+```
+
+So out of 61 days 8 days are having missing values! (which are shown)
+
+We have taken the average of steps taken in a particalar interval over all the days. While doing this we had excluded NA values in steps column for those 8 days.
+
+lets round off all the avergae values we found over the other days and see how it looks.
+```{r}
+round(i$meansteps)
+```
+
+It will be reasonable to replace the NA values with these rounded of average values. since there are only 8 days lets manually replace all thier values in steps column with the rounded off values!
+
+```{r}
+fill <- round(i$meansteps)
+dat4 <- dat2
+dat4[[1]][, 1] <- fill
+dat4[[8]][, 1] <- fill
+dat4[[32]][, 1] <- fill
+dat4[[35]][, 1] <- fill
+dat4[[40]][, 1] <- fill
+dat4[[41]][, 1] <- fill
+dat4[[45]][, 1] <- fill
+dat4[[61]][, 1] <- fill
+library(plyr)
+dat5 <- ldply(dat4, data.frame)
+dat5[, 1] <- NULL
+head(dat5, 10)
+```
+
+Now lets compare the new database with previous one
+
+```{r}
+head(dat2[[8]], 6)
+head(dat4[[8]], 6)
+```
+
+Creating a data frame from the New data frame 's2' containing sum, average and median of values including the NA replaces values
+
+```{r}
+daysum2 <- sapply(dat4, function(x) sum(x[, 1]))
+daymean2 <- sapply(dat4, function(x) mean(x[, 1]))
+daymedian2 <- sapply(dat4, function(x) median(x[, 1]))
+s2 <- data.frame(date = names(daysum2), totalsteps = daysum2, meansteps = daymean2, mediansteps = daymedian2)
+row.names(s2) <- 1:61
+```
+
+Lets make a histogram from the new data
+```{r}
+hist(s2$totalsteps, col ="blue", xlab = "No of steps", main = "Number of steps taken in a day")
+```
+
+There is a slight variation in the new histogram. e.x The frequency of no of days with steps taken between 10000 and 15000 has increased!
+
+Report of the mean and median of no of steps taken in a day
+```{r}
+s2[, 3:4]
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Lets make two data frames one for weekends and other for weekdays. Both containin the intervals and average of steps of all days over that weekend/weekday
+
+```{r}
+dat6 <- dat5
+dat6$date <- as.Date(dat6$date)
+wi <- NULL
+for(l in 1:17568)
+{
+   if(weekdays(dat6[l, 2]) == "Saturday" || weekdays(dat6[l, 2]) == "Sunday")
+        wi[l] <- 1
+   else
+        wi[l] <- 0
+}
+wif <- factor(wi, labels = c("weekday", "weekend"))
+dat6$day <- wif
+head(dat6, 10)
+dat7 <- split(dat6, dat6$day)
+weekday <- dat7[[1]]
+weekend <- dat7[[2]]
+
+weekday$interval <- as.factor(weekday$interval)
+weekend$interval <- as.factor(weekend$interval)
+
+weekday2 <- split(weekday, weekday$interval)
+wdintervalmean <- sapply(weekday2, function(x) mean(x[, 1], na.rm = TRUE))
+
+wd <- data.frame(interval = names(wdintervalmean), meansteps = wdintervalmean)
+row.names(wd) <- 1:288
+wd$interval <- intervals
+
+weekend2 <- split(weekend, weekend$interval)
+weintervalmean <- sapply(weekend2, function(x) mean(x[, 1], na.rm = TRUE))
+
+we <- data.frame(interval = names(weintervalmean), meansteps = weintervalmean)
+row.names(we) <- 1:288
+we$interval <- intervals
+
+head(wd)
+head(we)
+```
+
+Lets make a panel plot containg both the plots for weekdays and weekends
+```{r}
+par(mfcol = c(2, 1))
+plot(wd$interval, wd$meansteps, type ='l', xlab = "Interval", ylab = "Mean steps", col = "blue", main = "Weekdays")
+plot(we$interval, we$meansteps, type ='l', xlab = "Interval", ylab = "Mean steps", col = "blue", main = "weekends")
+```
+
+
+
